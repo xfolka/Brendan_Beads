@@ -39,6 +39,10 @@ testing = [
     "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
     "napari",
     "pyqt5",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "pyometiff",
 ]
 
 [project.entry-points."napari.manifest"]
