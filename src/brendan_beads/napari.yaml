@@ -6,52 +6,9 @@ visibility: public
 categories: ["Annotation", "Segmentation", "Acquisition"]
 contributions:
   commands:
-    - id: brendan-beads.get_reader
-      python_name: brendan_beads._reader:napari_get_reader
-      title: Open data with Brendan Beads
-    - id: brendan-beads.write_multiple
-      python_name: brendan_beads._writer:write_multiple
-      title: Save multi-layer data with Brendan Beads
-    - id: brendan-beads.write_single_image
-      python_name: brendan_beads._writer:write_single_image
-      title: Save image data with Brendan Beads
-    - id: brendan-beads.make_sample_data
-      python_name: brendan_beads._sample_data:make_sample_data
-      title: Load sample data from Brendan Beads
-    - id: brendan-beads.make_container_widget
-      python_name: brendan_beads:ImageThreshold
-      title: Make threshold Container widget
-    - id: brendan-beads.make_magic_widget
-      python_name: brendan_beads:threshold_magic_widget
-      title: Make threshold magic widget
-    - id: brendan-beads.make_function_widget
-      python_name: brendan_beads:threshold_autogenerate_widget
-      title: Make threshold function widget
-    - id: brendan-beads.make_qwidget
-      python_name: brendan_beads:ExampleQWidget
+    - id: brendan-beads.make_main_widget
+      python_name: brendan_beads:MainWidget
       title: Make example QWidget
-  readers:
-    - command: brendan-beads.get_reader
-      accepts_directories: false
-      filename_patterns: ['*.npy']
-  writers:
-    - command: brendan-beads.write_multiple
-      layer_types: ['image*','labels*']
-      filename_extensions: []
-    - command: brendan-beads.write_single_image
-      layer_types: ['image']
-      filename_extensions: ['.npy']
-  sample_data:
-    - command: brendan-beads.make_sample_data
-      display_name: Brendan Beads
-      key: unique_id.1
   widgets:
-    - command: brendan-beads.make_container_widget
-      display_name: Container Threshold
-    - command: brendan-beads.make_magic_widget
-      display_name: Magic Threshold
-    - command: brendan-beads.make_function_widget
-      autogenerate: true
-      display_name: Autogenerate Threshold
-    - command: brendan-beads.make_qwidget
-      display_name: Example QWidget
+    - command: brendan-beads.make_main_widget
+      display_name: Main Widget
