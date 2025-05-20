@@ -11,6 +11,8 @@ from skimage.morphology import ball, opening, disk, ellipse
 from scipy.spatial import cKDTree
 from concurrent.futures import ThreadPoolExecutor
 
+DATA_GEN_DIR = "_generated"
+
 
 def generate_and_visualize_future(filePath : pathlib.Path):
     future = ThreadPoolExecutor().submit(generate_and_visualize,filePath)
@@ -21,9 +23,18 @@ def generate_and_visualize(filePath : pathlib.Path):
     load_and_generate_data(filePath)
     return get_layers_to_visualize(filePath)
 
+def get_generated_data_dir(baseFile : pathlib.Path) -> pathlib.Path: 
+    f_name = baseFile.name
+    base_name = f_name.split(".ome.tiff")[0]
+    gen_dir = baseFile.parent.joinpath(base_name + DATA_GEN_DIR)
+    return gen_dir
 
 def load_and_generate_data(filePath : pathlib.Path):
 
+    #create data generation directory
+    g_dir = get_generated_data_dir(filePath)
+    g_dir_path = filePath.parent.joinpath(g_dir)
+    g_dir_path.mkdir(exist_ok=True)
     # Load the full z stack, this will be handled later by napari
     reader = OMETIFFReader(fpath=filePath)
     img_array, metadata, xml_metadata = reader.read()
@@ -48,11 +59,11 @@ def load_and_generate_data(filePath : pathlib.Path):
     center_coords = np.array([p.centroid for p in props])  # shape: (N, 3), in (z, y, x)
 
     fname = filePath.name
-    fdir = filePath.absolute()
+    #fdir = filePath.absolute()
     fname = fname.split(".ome.tiff")[0]
     fname = fname+"_blobs.ome.tiff"
-    omePath = filePath.parent.joinpath(fname)
-    print(omePath)
+    omePath = g_dir_path.joinpath(fname)
+    #print(omePath)
 
     dimension_order = "ZYX"
     metadata_dict = {
@@ -125,8 +136,8 @@ def load_and_generate_data(filePath : pathlib.Path):
     fname = filePath.name
     fname = fname.split(".ome.tiff")[0]
     fname = fname+"_surface.ome.tiff"
-    omePath = filePath.parent.joinpath(fname)
-    print(omePath)
+    omePath = g_dir_path.joinpath(fname)
+    #print(omePath)
 
     dimension_order = "ZYX"
     metadata_dict = {
@@ -200,7 +211,7 @@ def load_and_generate_data(filePath : pathlib.Path):
     fname = fname.split(".ome.tiff")[0]
     fname = fname + "_vector_table.csv"
 
-    csv_path = filePath.parent.joinpath(fname)
+    csv_path = g_dir_path.joinpath(fname)
     vector_table.to_csv(csv_path, index=False)
     
     
@@ -211,23 +222,28 @@ def get_layers_to_visualize(imgPath : pathlib.Path):
 
     reader = OMETIFFReader(fpath=imgPath)
     img_array, metadata, xml_metadata = reader.read()
-    nframes = img_array.shape[0]
+    #nframes = img_array.shape[0]
 
     channel_0 = img_array[0]  # shape: (140, 512, 512)
-    channel_1 = img_array[1]  # shape: (140, 512, 512)
+    #channel_1 = img_array[1]  # shape: (140, 512, 512)
 
-    channel_0.shape
+    #channel_0.shape
 
-    surface_path = pathlib.Path(f"./data/{img_name}_surface.ome.tiff")
+    #get data generate dir
+    dataGenDir = get_generated_data_dir(imgPath)
+    surface_path = dataGenDir.joinpath(f"{img_name}_surface.ome.tiff")
+
+    #surface_path = pathlib.Path(f"./data/{img_name}_surface.ome.tiff")
     reader = OMETIFFReader(fpath=surface_path)
     surface, metadata, xml_metadata = reader.read()
-    surface.shape
+    #surface.shape
 
-    blobs_path = pathlib.Path(f"./data/{img_name}_blobs.ome.tiff")
+    blobs_path = dataGenDir.joinpath(f"{img_name}_blobs.ome.tiff")
     reader = OMETIFFReader(fpath=blobs_path)
     blobs, metadata, xml_metadata = reader.read()
 
-    df = pd.read_csv(f"./data/{img_name}_vector_table.csv")
+    vectors_path = dataGenDir.joinpath(f"{img_name}_vector_table.csv")
+    df = pd.read_csv(vectors_path)
 
     # Reconstruct Napari vectors array
     starts = df[['z0', 'y0', 'x0']].to_numpy()

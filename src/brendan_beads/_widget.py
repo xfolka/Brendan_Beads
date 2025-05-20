@@ -43,7 +43,7 @@ class MainWidget(QWidget):
         
     def _show_all_layers(self, i,ii , s,si , b,bi , v,vi , scale):
         
-        self.viewer.add_image(i)
+        self.viewer.add_image(i, name=ii)
         self.viewer.add_labels(s, name=si)
         self.viewer.add_labels(b, name=bi)
         self.viewer.add_vectors(v, name=vi, edge_color='lime')
