@@ -1,35 +1,56 @@
 import pathlib
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 import pandas as pd
-
 from pyometiff import OMETIFFReader, OMETIFFWriter
 from scipy.ndimage import gaussian_filter
+from scipy.spatial import cKDTree
 from skimage.filters import threshold_otsu
 from skimage.measure import label, regionprops
+from skimage.morphology import ball, disk, ellipse, opening
 from skimage.segmentation import find_boundaries
-from skimage.morphology import ball, opening, disk, ellipse
-from scipy.spatial import cKDTree
-from concurrent.futures import ThreadPoolExecutor
 
 DATA_GEN_DIR = "_generated"
 
 
-def generate_and_visualize_future(filePath : pathlib.Path):
-    future = ThreadPoolExecutor().submit(generate_and_visualize,filePath)
+def generate_and_visualize_future(img_data, meta_data, filePath: pathlib.Path):
+    future = ThreadPoolExecutor().submit(generate_and_visualize, img_data, meta_data, filePath)
     return future
 
 
-def generate_and_visualize(filePath : pathlib.Path):
-    load_and_generate_data(filePath)
+def generate_and_visualize(img_data, metadata, filePath: pathlib.Path):
+    generate_data(img_data, metadata, filePath)
+    
+    #load_and_generate_data(filePath)
     return get_layers_to_visualize(filePath)
 
-def get_generated_data_dir(baseFile : pathlib.Path) -> pathlib.Path: 
+
+def get_generated_data_dir(baseFile: pathlib.Path) -> pathlib.Path:
     f_name = baseFile.name
     base_name = f_name.split(".ome.tiff")[0]
     gen_dir = baseFile.parent.joinpath(base_name + DATA_GEN_DIR)
     return gen_dir
 
-def load_and_generate_data(filePath : pathlib.Path):
+
+def get_and_create_data_dir(filePath: pathlib.Path):
+    g_dir = get_generated_data_dir(filePath)
+    g_dir_path = filePath.parent.joinpath(g_dir)
+    g_dir_path.mkdir(exist_ok=True)
+    return g_dir_path
+
+
+def generate_data(image_data, metadata, filePath: pathlib.Path):
+    
+    g_dir_path = get_and_create_data_dir(filePath)
+    fname = filePath.name
+    
+    blobs = generate_blobs_data_for(image_data[0], metadata, fname, g_dir_path)
+    surfaces = generate_surfaces_data_for(image_data[1], metadata, fname, g_dir_path)
+    generate_vectors_data_for(blobs, surfaces, metadata, fname, g_dir_path)
+
+
+def load_and_generate_data(filePath: pathlib.Path):
 
     #create data generation directory
     g_dir = get_generated_data_dir(filePath)
@@ -42,7 +63,10 @@ def load_and_generate_data(filePath : pathlib.Path):
     channel_0 = img_array[0]  # shape: (140, 512, 512)
     channel_1 = img_array[1]  # shape: (140, 512, 512)
 
-    ch1_filtered = gaussian_filter(channel_1, sigma=[2.,1.,1.])
+
+#MAKE SURE YOU SEND CHANNEL 0 HERE
+def generate_blobs_data_for(img_data, metadata, file_name, g_dir_path):
+    ch1_filtered = gaussian_filter(img_data, sigma=[2.,1.,1.])
     filt_op = np.max(ch1_filtered, axis=2)
     thresh = threshold_otsu(filt_op)
 
@@ -52,15 +76,15 @@ def load_and_generate_data(filePath : pathlib.Path):
     assert blobs.max()<65000, "issues here"
     blobs = blobs.astype(np.uint16)
 
-    # `blobs` is a labeled 3D array
-    props = regionprops(blobs)
+    # # `blobs` is a labeled 3D array
+    # props = regionprops(blobs)
 
-    # Extract centroids
-    center_coords = np.array([p.centroid for p in props])  # shape: (N, 3), in (z, y, x)
+    # # Extract centroids
+    # center_coords = np.array([p.centroid for p in props])  # shape: (N, 3), in (z, y, x)
 
-    fname = filePath.name
+    #fname = filePath.name
     #fdir = filePath.absolute()
-    fname = fname.split(".ome.tiff")[0]
+    fname = file_name.split(".ome.tiff")[0]
     fname = fname+"_blobs.ome.tiff"
     omePath = g_dir_path.joinpath(fname)
     #print(omePath)
@@ -70,10 +94,10 @@ def load_and_generate_data(filePath : pathlib.Path):
         "PhysicalSizeX" : metadata['PhysicalSizeX'],
         "PhysicalSizeXUnit" : "µm",
         "PhysicalSizeY" : metadata['PhysicalSizeY'],
-        "PhysicalSizeXUnit" : "µm",
+        "PhysicalSizeYUnit" : "µm",
         "PhysicalSizeZ" : metadata['PhysicalSizeZ'],
         "PhysicalSizeZUnit" : "µm",
-        
+
         "Channels" : {
             "filtered" : {
                 "Name" : "blobs",
@@ -91,6 +115,11 @@ def load_and_generate_data(filePath : pathlib.Path):
 
     writer.write()
 
+    return blobs
+
+
+#MAKE SURE YOU SEND CHANNEL 1 HERE
+def generate_surfaces_data_for(img_data, metadata, file_name, g_dir_path):
 
     def keep_largest_label(label_img):
         props = regionprops(label_img)
@@ -104,8 +133,7 @@ def load_and_generate_data(filePath : pathlib.Path):
         # Create a mask with only the largest label
         return (label_img == largest_label).astype(label_img.dtype)
 
-
-    ch0_filtered = gaussian_filter(channel_0, sigma=[.3,2,2])
+    ch0_filtered = gaussian_filter(img_data, sigma=[.3, 2, 2])
     filt_op = np.mean(ch0_filtered, axis=2)
     thresh = threshold_otsu(filt_op)
 
@@ -133,8 +161,8 @@ def load_and_generate_data(filePath : pathlib.Path):
     surface = surface.astype(np.uint16)
 
     surface = keep_largest_label(surface)
-    fname = filePath.name
-    fname = fname.split(".ome.tiff")[0]
+    #fname = filePath.name
+    fname = file_name.split(".ome.tiff")[0]
     fname = fname+"_surface.ome.tiff"
     omePath = g_dir_path.joinpath(fname)
     #print(omePath)
@@ -144,10 +172,10 @@ def load_and_generate_data(filePath : pathlib.Path):
         "PhysicalSizeX" : metadata['PhysicalSizeX'],
         "PhysicalSizeXUnit" : "µm",
         "PhysicalSizeY" : metadata['PhysicalSizeY'],
-        "PhysicalSizeXUnit" : "µm",
+        "PhysicalSizeYUnit" : "µm",
         "PhysicalSizeZ" : metadata['PhysicalSizeZ'],
         "PhysicalSizeZUnit" : "µm",
-        
+
         "Channels" : {
             "filtered" : {
                 "Name" : "surface",
@@ -164,12 +192,22 @@ def load_and_generate_data(filePath : pathlib.Path):
         explicit_tiffdata=False)
 
     writer.write()
+    
+    return surface
 
 
+def generate_vectors_data_for(blobs_img_data, surface_img_data, metadata, file_name, g_dir_path):
+    
+    # `blobs` is a labeled 3D array
+    props = regionprops(blobs_img_data)
+
+    # Extract centroids
+    center_coords = np.array([p.centroid for p in props])  # shape: (N, 3), in (z, y, x)
+    
     # Physical voxel size: (z, y, x)
     voxel_size = np.array([metadata['PhysicalSizeZ'], metadata['PhysicalSizeY'], metadata['PhysicalSizeX']])  # in microns
 
-    edges = find_boundaries(surface>0, mode='outer')
+    edges = find_boundaries(surface_img_data>0, mode='outer')
     edge_coords = np.column_stack(np.nonzero(edges))
 
     # Scale coordinates to real physical units
@@ -206,15 +244,14 @@ def load_and_generate_data(filePath : pathlib.Path):
         'distance': dists
     })
 
-    # Save to CSV
-    fname = filePath.name
-    fname = fname.split(".ome.tiff")[0]
+    #Save to CSV
+    fname = file_name.split(".ome.tiff")[0]
     fname = fname + "_vector_table.csv"
 
     csv_path = g_dir_path.joinpath(fname)
     vector_table.to_csv(csv_path, index=False)
-    
-    
+
+
 def get_layers_to_visualize(imgPath : pathlib.Path):
     # Load the full z stack, this will be handled later by napari
     img_name = imgPath.name
@@ -254,4 +291,10 @@ def get_layers_to_visualize(imgPath : pathlib.Path):
 
     voxel_size = np.array([metadata['PhysicalSizeZ'], metadata['PhysicalSizeY'], metadata['PhysicalSizeX']])  # in microns
 
-    return channel_0, "image", surface, "surface", blobs, "blobs", vectors,"vectors", voxel_size
+    return channel_0, "image", surface, "surface", blobs, "blobs", vectors, "vectors", voxel_size
+
+
+def read_ome_tiff(file: pathlib.Path):
+    reader = OMETIFFReader(fpath=file)
+    image, metadata, xml_metadata = reader.read()
+    return image, metadata
