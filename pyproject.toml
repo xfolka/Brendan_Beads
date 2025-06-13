@@ -29,6 +29,7 @@ dependencies = [
     "magicgui",
     "qtpy",
     "scikit-image",
+    "pyometiff",
 ]
 
 [project.optional-dependencies]
